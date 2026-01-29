@@ -10,5 +10,5 @@ Context:
 Question:
 {question}
 
-Answer (cite sources):
+Answer with citations:
 """
