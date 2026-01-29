@@ -1,6 +1,6 @@
 import os
 import streamlit as st
-import pinecone
+from pinecone import Pinecone
 import PyPDF2
 from sentence_transformers import SentenceTransformer
 from database import add_document, add_chunk
@@ -11,14 +11,10 @@ def load_embedding_model():
 
 model = load_embedding_model()
 
-pinecone.init(
-    api_key=os.getenv("PINECONE_API_KEY"),
-    environment=os.getenv("PINECONE_ENV")
-)
-
 @st.cache_resource
 def load_index():
-    return pinecone.Index("rag-index")
+    pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+    return pc.Index("rag-index")
 
 index = load_index()
 
