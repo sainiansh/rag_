@@ -1,29 +1,45 @@
-from sentence_transformers import SentenceTransformer
-import PyPDF2
-from database import add_document, add_chunk
+import os
+import streamlit as st
 import pinecone
+import PyPDF2
+from sentence_transformers import SentenceTransformer
+from database import add_document, add_chunk
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
+@st.cache_resource
+def load_embedding_model():
+    return SentenceTransformer("all-MiniLM-L6-v2")
 
-pinecone.init(api_key="YOUR_KEY", environment="YOUR_ENV")
-index = pinecone.Index("rag-index")
+model = load_embedding_model()
+
+pinecone.init(
+    api_key=os.getenv("PINECONE_API_KEY"),
+    environment=os.getenv("PINECONE_ENV")
+)
+
+@st.cache_resource
+def load_index():
+    return pinecone.Index("rag-index")
+
+index = load_index()
 
 def read_file(file):
     if file.name.endswith(".pdf"):
         reader = PyPDF2.PdfReader(file)
-        return " ".join([p.extract_text() for p in reader.pages])
-    return file.read().decode()
+        return " ".join([p.extract_text() or "" for p in reader.pages])
+    return file.read().decode("utf-8")
 
 def chunk_text(text, size=500, overlap=50):
     chunks = []
-    for i in range(0, len(text), size - overlap):
-        chunks.append(text[i:i + size])
+    start = 0
+    while start < len(text):
+        chunks.append(text[start:start + size])
+        start += size - overlap
     return chunks
 
 def ingest_files(files):
     for file in files:
         text = read_file(file)
-        doc_id = add_document(file.name)
+        doc_id = add_document(file.name, file.name.split(".")[-1])
         chunks = chunk_text(text)
 
         embeddings = model.encode(chunks).tolist()
@@ -31,6 +47,8 @@ def ingest_files(files):
 
         for chunk, emb in zip(chunks, embeddings):
             chunk_id = add_chunk(doc_id, chunk)
-            vectors.append((str(chunk_id), emb, {"doc_id": doc_id}))
+            vectors.append(
+                (str(chunk_id), emb, {"doc_id": doc_id})
+            )
 
-        index.upsert(vectors)
+        index.upsert(vectors=vectors)
