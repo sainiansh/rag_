@@ -12,7 +12,13 @@ from metrics import log_retrieval
 
 init_db()
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+GROQ_API_KEY = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
+
+if not GROQ_API_KEY:
+    st.error("GROQ_API_KEY not found. Please add it in Streamlit Secrets.")
+    st.stop()
+
+client = Groq(api_key=GROQ_API_KEY)
 
 st.set_page_config(page_title="RAG System", layout="wide")
 st.title("📚 Production-Ready RAG System")
