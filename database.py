@@ -5,11 +5,14 @@ import os
 DB_PATH = "data/rag.db"
 os.makedirs("data", exist_ok=True)
 
-conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-cursor = conn.cursor()
+def get_connection():
+    return sqlite3.connect(DB_PATH, check_same_thread=False)
 
 def init_db():
-    cursor.execute("""
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS documents (
         doc_id INTEGER PRIMARY KEY AUTOINCREMENT,
         file_name TEXT NOT NULL,
@@ -18,7 +21,7 @@ def init_db():
     )
     """)
 
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS chunks (
         chunk_id INTEGER PRIMARY KEY AUTOINCREMENT,
         doc_id INTEGER,
@@ -28,7 +31,7 @@ def init_db():
     )
     """)
 
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS retrieval_logs (
         log_id INTEGER PRIMARY KEY AUTOINCREMENT,
         query TEXT,
@@ -38,37 +41,71 @@ def init_db():
         timestamp TEXT
     )
     """)
+
     conn.commit()
+    conn.close()
 
 def add_document(file_name, file_type):
-    cursor.execute(
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute(
         "INSERT INTO documents VALUES (NULL, ?, ?, ?)",
         (file_name, file_type, datetime.now())
     )
+
     conn.commit()
-    return cursor.lastrowid
+    doc_id = cur.lastrowid
+    conn.close()
+    return doc_id
 
 def add_chunk(doc_id, text, page_number=None):
-    cursor.execute(
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute(
         "INSERT INTO chunks VALUES (NULL, ?, ?, ?)",
         (doc_id, text, page_number)
     )
+
     conn.commit()
-    return cursor.lastrowid
+    chunk_id = cur.lastrowid
+    conn.close()
+    return chunk_id
 
 def get_documents():
-    cursor.execute("SELECT * FROM documents")
-    return cursor.fetchall()
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("SELECT * FROM documents")
+    rows = cur.fetchall()
+
+    conn.close()
+    return rows
 
 def get_chunks_by_ids(chunk_ids):
+    if not chunk_ids:
+        return []
+
+    conn = get_connection()
+    cur = conn.cursor()
+
     placeholders = ",".join("?" * len(chunk_ids))
-    cursor.execute(
+    cur.execute(
         f"SELECT chunk_text FROM chunks WHERE chunk_id IN ({placeholders})",
         chunk_ids
     )
-    return [row[0] for row in cursor.fetchall()]
+
+    rows = [r[0] for r in cur.fetchall()]
+    conn.close()
+    return rows
 
 def delete_document(doc_id):
-    cursor.execute("DELETE FROM chunks WHERE doc_id=?", (doc_id,))
-    cursor.execute("DELETE FROM documents WHERE doc_id=?", (doc_id,))
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("DELETE FROM chunks WHERE doc_id=?", (doc_id,))
+    cur.execute("DELETE FROM documents WHERE doc_id=?", (doc_id,))
+
     conn.commit()
+    conn.close()
