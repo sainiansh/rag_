@@ -1,6 +1,6 @@
 import os
 import streamlit as st
-import pinecone
+from pinecone import Pinecone
 from sentence_transformers import SentenceTransformer
 from rank_bm25 import BM25Okapi
 from database import get_chunks_by_ids
@@ -11,14 +11,10 @@ def load_model():
 
 model = load_model()
 
-pinecone.init(
-    api_key=os.getenv("PINECONE_API_KEY"),
-    environment=os.getenv("PINECONE_ENV")
-)
-
 @st.cache_resource
 def load_index():
-    return pinecone.Index("rag-index")
+    pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+    return pc.Index("rag-index")
 
 index = load_index()
 
@@ -33,6 +29,7 @@ def semantic_search(query, top_k=10):
 
 def hybrid_search(query, top_k=10):
     semantic_results = semantic_search(query, top_k)
+
     chunk_ids = [int(r["id"]) for r in semantic_results]
     texts = get_chunks_by_ids(chunk_ids)
 
